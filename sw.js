@@ -5,8 +5,7 @@ const urlsToCache = [
   './manifest.json',
   './icon-192x192.png',
   './icon-512x512.png',
-  './script.js',
-  // Add more files here if needed
+  // './script.js' removed because it's not used
 ];
 
 // Install: Pre-cache assets
@@ -35,29 +34,29 @@ self.addEventListener('activate', event => {
   self.clients.claim(); // Take control of all clients
 });
 
-// Fetch: Cache-first strategy
+// Fetch: Cache-first strategy with fallback and safe caching
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(response => {
       return (
         response ||
-        fetch(event.request)
-          .then(networkResponse => {
-            // Cache the new response if OK
-            if (networkResponse.status === 200) {
-              const cloned = networkResponse.clone();
-              caches.open(CACHE_NAME).then(cache => {
+        fetch(event.request).then(networkResponse => {
+          if (networkResponse.status === 200) {
+            const cloned = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              // ✅ Only cache your own site's assets
+              if (event.request.url.startsWith(self.location.origin)) {
                 cache.put(event.request, cloned);
-              });
-            }
-            return networkResponse;
-          })
-          .catch(() => {
-            // Offline fallback: optional, show custom offline page
-            if (event.request.destination === 'document') {
-              return caches.match('./index.html');
-            }
-          })
+              }
+            });
+          }
+          return networkResponse;
+        }).catch(() => {
+          // Offline fallback for pages
+          if (event.request.destination === 'document') {
+            return caches.match('./index.html');
+          }
+        })
       );
     })
   );
